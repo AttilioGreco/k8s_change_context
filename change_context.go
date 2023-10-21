@@ -4,26 +4,20 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"strings"
 
 	"github.com/akamensky/argparse"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
 
-type Context struct {
-	isCurrent bool
-	name      string
-}
-
 func main() {
 
 	// Create new parser object
 	parser := argparse.NewParser("print", "Prints provided string to stdout")
-	// Create string flag
-	var next *bool = parser.Flag("n", "nextContext", &argparse.Options{Required: false, Help: "Set to next context"})
-	var previus *bool = parser.Flag("p", "previusContext", &argparse.Options{Required: false, Help: "Set to previus context"})
 	var showCurrentContext *bool = parser.Flag("c", "showCurrentContext", &argparse.Options{Required: false, Help: "Show Current Context"})
+	var showListContext *bool = parser.Flag("s", "showListContext", &argparse.Options{Required: false, Help: "Show Context List"})
+	var setContext *string = parser.String("n", "newContext", &argparse.Options{Required: false, Help: "Set new context"})
 	// Parse input
 	err := parser.Parse(os.Args)
 	if err != nil {
@@ -37,105 +31,61 @@ func main() {
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = filepath.Join(home, ".kube", "config")
 	}
+
 	if *showCurrentContext {
-		getCurrentContext(kubeconfig)
+		ctx, _ := getCurrentContext(kubeconfig)
+		fmt.Printf(ctx)
 	}
 
-	if *next {
-		goNextContext(kubeconfig)
+	if *showListContext {
+		ListContext(kubeconfig)
 	}
 
-	if *previus {
-		goPreviusContext(kubeconfig)
+	if *setContext != "" {
+		newContext := fmt.Sprint(*setContext)
+		fmt.Println(newContext)
+		setNewContext(kubeconfig, newContext)
 	}
+
 }
 
-func goNextContext(kubeconfigPath string) (err error) {
+func getCurrentContext(kubeconfigPath string) (ctx string, err error) {
 	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
 	configOverrides := &clientcmd.ConfigOverrides{}
 
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 	config, err := kubeConfig.RawConfig()
 	if err != nil {
-		return fmt.Errorf("error getting RawConfig: %w", err)
+		return "", err
 	}
-	keys := make([]string, 0, len(config.Contexts))
-	for name := range config.Contexts {
-		keys = append(keys, name)
-	}
-	sort.Strings(keys)
 
-	// index := 0
-	indexPrev := 0
-	for index, name := range keys {
+	return strings.Trim(config.CurrentContext, "\n"), nil
+}
+
+func ListContext(kubeconfigPath string) (ctx string, err error) {
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
+	configOverrides := &clientcmd.ConfigOverrides{}
+
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	config, err := kubeConfig.RawConfig()
+	if err != nil {
+		return "", err
+	}
+
+	//var contexts []string
+	for name, _ := range config.Contexts {
+
 		if name == config.CurrentContext {
-			indexPrev = index + 1
-			if index == len(keys)-1 {
-				indexPrev = 0
-			}
-			break
+			fmt.Printf("--> %s <--\n", name)
+		} else {
+			fmt.Printf("    %s\n", name)
 		}
 	}
-	for index, name := range keys {
-		if index == indexPrev {
-			switchContext(name, kubeconfigPath)
-		}
-	}
-	getCurrentContext(kubeconfigPath)
-	return nil
+
+	return "", nil
 }
 
-func goPreviusContext(kubeconfigPath string) (err error) {
-	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
-	configOverrides := &clientcmd.ConfigOverrides{}
-
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	config, err := kubeConfig.RawConfig()
-	if err != nil {
-		return fmt.Errorf("error getting RawConfig: %w", err)
-	}
-	keys := make([]string, 0, len(config.Contexts))
-	for name := range config.Contexts {
-		keys = append(keys, name)
-	}
-	sort.Strings(keys)
-
-	// index := 0
-	indexPrev := 0
-	for index, name := range keys {
-		if name == config.CurrentContext {
-			indexPrev = index - 1
-			if index == 0 {
-				indexPrev = len(keys) - 1
-			}
-			break
-		}
-	}
-	for index, name := range keys {
-		if index == indexPrev {
-			switchContext(name, kubeconfigPath)
-			break
-		}
-	}
-	getCurrentContext(kubeconfigPath)
-	return nil
-}
-
-func getCurrentContext(kubeconfigPath string) (err error) {
-	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
-	configOverrides := &clientcmd.ConfigOverrides{}
-
-	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-	config, err := kubeConfig.RawConfig()
-	if err != nil {
-		return fmt.Errorf("error getting RawConfig: %w", err)
-	}
-	fmt.Println(config.CurrentContext)
-
-	return nil
-}
-
-func switchContext(ctx, kubeconfigPath string) (err error) {
+func setNewContext(kubeconfigPath string, newContext string) (err error) {
 	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
 	configOverrides := &clientcmd.ConfigOverrides{}
 
@@ -145,15 +95,16 @@ func switchContext(ctx, kubeconfigPath string) (err error) {
 		return fmt.Errorf("error getting RawConfig: %w", err)
 	}
 
-	if config.Contexts[ctx] == nil {
-		return fmt.Errorf("context %s doesn't exists", ctx)
+	if config.Contexts[newContext] == nil {
+		return fmt.Errorf("context %s doesn't exists", newContext)
 	}
 
-	config.CurrentContext = ctx
+	config.CurrentContext = newContext
 	err = clientcmd.ModifyConfig(clientcmd.NewDefaultPathOptions(), config, true)
 	if err != nil {
 		return fmt.Errorf("error ModifyConfig: %w", err)
 	}
 
 	return nil
+
 }
