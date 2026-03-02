@@ -17,8 +17,9 @@
 
           src = ./.;
 
-          # Uses the vendor/ directory — run `go mod vendor` after updating deps.
-          vendorHash = null;
+          # Placeholder: run the command below to get the real hash, then update this line.
+          # nix build 2>&1 | grep "got:" | awk '{print $NF}'
+          vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
           ldflags = [ "-s" "-w" ];
 

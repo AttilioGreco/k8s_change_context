@@ -2,3 +2,4 @@ dist/
 dotfile
 k8s-change-context
 result
+vendor/
