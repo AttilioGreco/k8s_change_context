@@ -1,56 +1,48 @@
 package main
 
 import (
+	"flag"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/akamensky/argparse"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 )
 
 func main() {
 
-	// Create new parser object
-	parser := argparse.NewParser("print", "Prints provided string to stdout")
-	var showCurrentContext *bool = parser.Flag("c", "showCurrentContext", &argparse.Options{Required: false, Help: "Show Current Context"})
-	var showListContext *bool = parser.Flag("s", "showListContext", &argparse.Options{Required: false, Help: "Show Context List"})
-	var setContext *string = parser.String("n", "newContext", &argparse.Options{Required: false, Help: "Set new context"})
-	// Parse input
-	err := parser.Parse(os.Args)
-	if err != nil {
-		// In case of error print error and print usage
-		// This can also be done by passing -h or --help flags
-		fmt.Print(parser.Usage(err))
-	}
+	var showCurrentContext = flag.Bool("c", false, "Show Current Context")
+	var showListContext = flag.Bool("s", false, "Show Context List")
+	var setContext = flag.String("n", "", "Set new context")
 
-	var kubeconfig string
+	flag.Parse()
+
+	var kubeConfig string
 
 	if home := homedir.HomeDir(); home != "" {
-		kubeconfig = filepath.Join(home, ".kube", "config")
+		kubeConfig = filepath.Join(home, ".kube", "config")
 	}
 
 	if *showCurrentContext {
-		ctx, _ := getCurrentContext(kubeconfig)
-		fmt.Printf(ctx)
+		ctx, _ := getCurrentContext(kubeConfig)
+		fmt.Printf("Current Context: %s\n", ctx)
 	}
 
 	if *showListContext {
-		ListContext(kubeconfig)
+		ListContext(kubeConfig)
 	}
 
 	if *setContext != "" {
 		newContext := fmt.Sprint(*setContext)
 		fmt.Println(newContext)
-		setNewContext(kubeconfig, newContext)
+		setNewContext(kubeConfig, newContext)
 	}
 
 }
 
-func getCurrentContext(kubeconfigPath string) (ctx string, err error) {
-	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfigPath}
+func getCurrentContext(kubeConfigPath string) (ctx string, err error) {
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeConfigPath}
 	configOverrides := &clientcmd.ConfigOverrides{}
 
 	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
@@ -72,8 +64,7 @@ func ListContext(kubeconfigPath string) (ctx string, err error) {
 		return "", err
 	}
 
-	//var contexts []string
-	for name, _ := range config.Contexts {
+	for name := range config.Contexts {
 
 		if name == config.CurrentContext {
 			fmt.Printf("--> %s <--\n", name)
