@@ -19,7 +19,7 @@
 
           # Placeholder: run the command below to get the real hash, then update this line.
           # nix build 2>&1 | grep "got:" | awk '{print $NF}'
-          vendorHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          vendorHash = "sha256-1/nEZE1NcCrjWkjM1cI2pAMT78li6ugA4OhviOwdGsk=";
 
           ldflags = [ "-s" "-w" ];
 
